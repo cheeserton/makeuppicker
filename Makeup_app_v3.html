@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Makeup Look Builder 💄✨</title>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <style>
+    :root {
+      --primary: #ff007f;
+      --primary-neon: #ff2a8d;
+      --bg-dark: #0f020a;
+      --yellow-highlight: #ffe600;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
+
+    body {
+      background: var(--bg-dark);
+      background-image: 
+        radial-gradient(circle at 10% 20%, rgba(255, 0, 127, 0.25) 0%, transparent 40%),
+        radial-gradient(circle at 90% 80%, rgba(255, 0, 255, 0.2) 0%, transparent 40%);
+      color: #fff;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 1.5rem;
+    }
+
+    canvas:not(.wheel-canvas) {
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      pointer-events: none !important;
+      z-index: 9999 !important;
+    }
+
+    h1 {
+      font-size: 2.2rem;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: #fff;
+      text-shadow: 0 0 10px var(--primary-neon), 0 0 20px var(--primary);
+      margin-bottom: 0.3rem;
+      text-align: center;
+    }
+
+    .subtitle {
+      color: #ff99dd;
+      font-size: 0.95rem;
+      margin-bottom: 1.5rem;
+      text-align: center;
+    }
+
+    .wheels-container {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: flex-start;
+      gap: 2.5rem;
+      max-width: 900px;
+      width: 100%;
+    }
+
+    .wheel-section {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .step-badge {
+      background: rgba(255, 0, 127, 0.25);
+      border: 1px solid var(--primary-neon);
+      color: #ffb3e6;
+      padding: 0.3rem 0.9rem;
+      border-radius: 15px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      margin-bottom: 0.8rem;
+      text-transform: uppercase;
+    }
+
+    .wheel-wrapper {
+      position: relative;
+      width: 320px;
+      height: 380px;
+      touch-action: none;
+    }
+
+    .pointer-left, .pointer-right {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 0; 
+      height: 0; 
+      z-index: 20;
+      pointer-events: none;
+    }
+
+    .pointer-left {
+      left: -15px;
+      border-top: 18px solid transparent;
+      border-bottom: 18px solid transparent;
+      border-left: 28px solid var(--yellow-highlight);
+      filter: drop-shadow(0 0 8px #ffcc00);
+    }
+
+    .pointer-right {
+      right: -15px;
+      border-top: 18px solid transparent;
+      border-bottom: 18px solid transparent;
+      border-right: 28px solid var(--yellow-highlight);
+      filter: drop-shadow(0 0 8px #ffcc00);
+    }
+
+    .wheel-canvas {
+      width: 320px;
+      height: 380px;
+      border-radius: 16px;
+      box-shadow: 0 0 35px var(--primary);
+      cursor: grab;
+    }
+
+    .wheel-canvas:active {
+      cursor: grabbing;
+    }
+
+    .spin-btn {
+      margin-top: 1.2rem;
+      background: linear-gradient(45deg, #ff007f, #ff00ff);
+      color: #fff;
+      border: 2px solid #fff;
+      padding: 0.8rem 2rem;
+      font-size: 1.05rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      border-radius: 30px;
+      cursor: pointer;
+      box-shadow: 0 0 20px var(--primary-neon);
+      transition: transform 0.1s ease, box-shadow 0.2s ease;
+    }
+
+    .spin-btn:hover:not(:disabled) {
+      transform: scale(1.05);
+      box-shadow: 0 0 30px var(--primary-neon);
+    }
+
+    .spin-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      filter: grayscale(80%);
+    }
+
+    /* Product Wheel Section Hidden Initially */
+    #productSection {
+      display: none;
+      animation: fadeIn 0.4s ease-out forwards;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(15px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .results-wrapper {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      width: 100%;
+      max-width: 500px;
+      margin-top: 1.8rem;
+    }
+
+    .winner-box {
+      background: rgba(255, 230, 0, 0.1);
+      border: 2px dashed var(--yellow-highlight);
+      border-radius: 12px;
+      padding: 1rem;
+      text-align: center;
+      display: none;
+    }
+
+    .winner-box h3 { 
+      color: var(--yellow-highlight); 
+      font-size: 1.3rem; 
+      margin-bottom: 0.2rem; 
+      text-transform: uppercase;
+    }
+
+    .sub-text {
+      color: #ffb3e6;
+      font-size: 0.85rem;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Makeup Look Builder 💄✨</h1>
+  <p class="subtitle">Spin the category wheel first, then spin for your exact product!</p>
+
+  <div class="wheels-container">
+    <!-- WHEEL 1: CATEGORY -->
+    <div class="wheel-section" id="categorySection">
+      <div class="step-badge">Step 1: Category</div>
+      <div class="wheel-wrapper">
+        <div class="pointer-left"></div>
+        <div class="pointer-right"></div>
+        <canvas id="categoryCanvas" class="wheel-canvas" width="320" height="380"></canvas>
+      </div>
+      <button class="spin-btn" id="catSpinBtn" onclick="spinCategoryWheel()">PICK CATEGORY 🎲</button>
+    </div>
+
+    <!-- WHEEL 2: PRODUCT (Appears after Category is chosen) -->
+    <div class="wheel-section" id="productSection">
+      <div class="step-badge" id="productStepBadge">Step 2: Product</div>
+      <div class="wheel-wrapper">
+        <div class="pointer-left"></div>
+        <div class="pointer-right"></div>
+        <canvas id="productCanvas" class="wheel-canvas" width="320" height="380"></canvas>
+      </div>
+      <button class="spin-btn" id="prodSpinBtn" onclick="spinProductWheel()">PICK PRODUCT 🎲</button>
+    </div>
+  </div>
+
+  <div class="results-wrapper">
+    <div class="winner-box" id="categoryWinnerBox">
+      <p class="sub-text">Selected Category:</p>
+      <h3 id="categoryWinnerTitle">Category Name</h3>
+    </div>
+
+    <div class="winner-box" id="productWinnerBox">
+      <p class="sub-text">Selected Product:</p>
+      <h3 id="productWinnerTitle">Brand & Product Name</h3>
+    </div>
+  </div>
+
+<script>
+  // Top-Level Categories
+  const CATEGORIES = [
+    'Lipsticks', 
+    'Lip Liners', 
+    'Blush', 
+    'Shadow Sticks', 
+    'Eyeliners', 
+    'Liquid Eyeshadows', 
+    'Eyeshadow Palettes'
+  ];
+
+  // Brand + Product Name Data for each category
+  const PRODUCTS_BY_CATEGORY = {
+    'Lipsticks': [
+      'MAC - Velvet Teddy',
+      'Fenty - Gloss Bomb Stix',
+      'Charlotte Tilbury - Pillow Talk',
+      'Rare Beauty - Kind Words',
+      'NARS - Powermatte Lip',
+      'YSL - Rouge Volupté',
+      'Maybelline - SuperStay Ink'
+    ],
+    'Lip Liners': [
+      'MAC - Spice',
+      'Charlotte Tilbury - Lip Cheat',
+      'NYX - Slim Lip Pencil',
+      'Make Up For Ever - Wherever Walnut',
+      'Tower 28 - OneLiner',
+      'Refy - Lip Sculpt',
+      'Sephora Collection - Rouge Gel'
+    ],
+    'Blush': [
+      'Rare Beauty - Soft Pinch Liquid',
+      'NARS - Orgasm Powder Blush',
+      'Glossier - Cloud Paint',
+      'Patrick Ta - Double-Take Cream',
+      'Fenty - Cheeks Out Cream',
+      'Saie - Dew Blush',
+      'Benefit - Benetint Lip & Cheek'
+    ],
+    'Shadow Sticks': [
+      'Laura Mercier - Caviar Stick',
+      'Bobbi Brown - Long-Wear Cream',
+      'Kuddy - Color Shadow Stick',
+      'e.l.f. - No Budge Shadow Stick',
+      'Rare Beauty - All-of-Above Stick',
+      'Nudestix - Magnetic Eye Color',
+      'NYX - Jumbo Eye Pencil'
+    ],
+    'Eyeliners': [
+      'Urban Decay - 24/7 Glide-On',
+      'Stila - Stay All Day Liquid',
+      'KVD Beauty - Tattoo Liner',
+      'One/Size - Point Made Liquid',
+      'NYX - Epic Ink Liner',
+      'Victoria Beckham - Satin Kajal',
+      'Makeup By Mario - Master Pigment'
+    ],
+    'Liquid Eyeshadows': [
+      'Stila - Glitter & Glow',
+      'Danessa Myricks - Twin Flames',
+      'e.l.f. - Liquid Metallic Eye',
+      'About-Face - Matte Fluid Eye',
+      'Rem Beauty - Lustrous Liquid',
+      'Glossier - Lidstar Eye Glow',
+      'Hourglass - Scatter Light'
+    ],
+    'Eyeshadow Palettes': [
+      'Urban Decay - Naked3 Palette',
+      'Makeup By Mario - Ethereal Eyes',
+      'Anastasia - Modern Renaissance',
+      'Natasha Denona - Glam Palette',
+      'Too Faced - Born This Way',
+      'Tarte - Tartelette In Bloom',
+      'Huda Beauty - Empowered'
+    ]
+  };
+
+  const sliceColors = [
+    '#ff0055', '#7b2cbf', '#ff9e00', '#00b4d8', 
+    '#38b000', '#e01e37', '#9d4edd'
+  ];
+
+  // Category Wheel State
+  let catPos = 0;
+  let isCatSpinning = false;
+  let winningCatIndex = 0;
+  let selectedCategory = '';
+
+  // Product Wheel State
+  let prodPos = 0;
+  let isProdSpinning = false;
+  let winningProdIndex = 0;
+  let currentProductList = [];
+
+  // Drag variables for Category Wheel
+  let catDragging = false;
+  let catStartY = 0;
+  let catDragStartPos = 0;
+
+  // Drag variables for Product Wheel
+  let prodDragging = false;
+  let prodStartY = 0;
+  let prodDragStartPos = 0;
+
+  const catCanvas = document.getElementById('categoryCanvas');
+  const prodCanvas = document.getElementById('productCanvas');
+
+  // Generic render function for 3D Big Wheel
+  function drawBigWheel(canvasObj, items, currentPos) {
+    const ctx = canvasObj.getContext('2d');
+    const width = canvasObj.width;
+    const height = canvasObj.height;
+    const centerY = height / 2;
+    const numSlices = items.length;
+    const sliceAngle = (2 * Math.PI) / numSlices;
+
+    ctx.clearRect(0, 0, width, height);
+
+    ctx.fillStyle = '#0a0107';
+    ctx.fillRect(0, 0, width, height);
+
+    const railGradient = ctx.createLinearGradient(0, 0, width, 0);
+    railGradient.addColorStop(0, '#ff007f');
+    railGradient.addColorStop(0.08, '#33001a');
+    railGradient.addColorStop(0.12, '#110109');
+    railGradient.addColorStop(0.88, '#110109');
+    railGradient.addColorStop(0.92, '#33001a');
+    railGradient.addColorStop(1, '#ff007f');
+    ctx.fillStyle = railGradient;
+    ctx.fillRect(0, 0, width, height);
+
+    const drumLeft = 35;
+    const drumWidth = width - 70;
+    const radius = 160;
+
+    for (let i = 0; i < numSlices; i++) {
+      let angle = currentPos + (i * sliceAngle);
+      angle = Math.atan2(Math.sin(angle), Math.cos(angle));
+
+      if (angle > -Math.PI / 1.8 && angle < Math.PI / 1.8) {
+        const yTop = centerY + Math.sin(angle - sliceAngle / 2) * radius;
+        const yBottom = centerY + Math.sin(angle + sliceAngle / 2) * radius;
+        const sliceHeight = yBottom - yTop;
+
+        if (sliceHeight > 1) {
+          const depth = Math.cos(angle);
+          
+          ctx.save();
+          ctx.fillStyle = sliceColors[i % sliceColors.length];
+          ctx.fillRect(drumLeft, yTop, drumWidth, sliceHeight);
+
+          const shadowGrad = ctx.createLinearGradient(0, yTop, 0, yBottom);
+          shadowGrad.addColorStop(0, 'rgba(0,0,0,0.6)');
+          shadowGrad.addColorStop(0.3, 'rgba(0,0,0,0)');
+          shadowGrad.addColorStop(0.7, 'rgba(0,0,0,0)');
+          shadowGrad.addColorStop(1, 'rgba(0,0,0,0.6)');
+          ctx.fillStyle = shadowGrad;
+          ctx.fillRect(drumLeft, yTop, drumWidth, sliceHeight);
+
+          ctx.fillStyle = '#ffe600';
+          ctx.fillRect(drumLeft, yTop, drumWidth, 3);
+
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath();
+          ctx.arc(drumLeft - 8, yTop + sliceHeight / 2, 4 * depth + 1, 0, Math.PI * 2);
+          ctx.arc(drumLeft + drumWidth + 8, yTop + sliceHeight / 2, 4 * depth + 1, 0, Math.PI * 2);
+          ctx.fill();
+
+          if (depth > 0.2) {
+            ctx.fillStyle = '#ffffff';
+            // Adjust font size dynamically if label is long
+            const rawLabel = items[i];
+            let fontPx = 16;
+            if (rawLabel.length > 22) fontPx = 11;
+            else if (rawLabel.length > 16) fontPx = 13;
+
+            const fontSize = Math.max(9, Math.floor(fontPx * depth));
+            ctx.font = `900 ${fontSize}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            
+            ctx.shadowColor = '#000';
+            ctx.shadowBlur = 4;
+            ctx.shadowOffsetY = 2;
+
+            ctx.fillText(rawLabel, width / 2, yTop + sliceHeight / 2);
+          }
+
+          ctx.restore();
+        }
+      }
+    }
+
+    ctx.strokeStyle = 'rgba(255, 230, 0, 0.8)';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(drumLeft - 2, centerY - 22, drumWidth + 4, 44);
+  }
+
+  function drawCategoryWheel() {
+    drawBigWheel(catCanvas, CATEGORIES, catPos);
+  }
+
+  function drawProductWheel() {
+    if (currentProductList.length > 0) {
+      drawBigWheel(prodCanvas, currentProductList, prodPos);
+    }
+  }
+
+  /* --- Category Wheel Drag Handling --- */
+  catCanvas.addEventListener('mousedown', (e) => startCatDrag(e.clientY));
+  window.addEventListener('mousemove', (e) => moveCatDrag(e.clientY));
+  window.addEventListener('mouseup', endCatDrag);
+
+  catCanvas.addEventListener('touchstart', (e) => startCatDrag(e.touches[0].clientY));
+  window.addEventListener('touchmove', (e) => moveCatDrag(e.touches[0].clientY));
+  window.addEventListener('touchend', endCatDrag);
+
+  function startCatDrag(y) {
+    if (isCatSpinning) return;
+    catDragging = true;
+    catStartY = y;
+    catDragStartPos = catPos;
+  }
+
+  function moveCatDrag(y) {
+    if (!catDragging) return;
+    const deltaY = y - catStartY;
+    catPos = catDragStartPos + (deltaY * 0.015);
+    drawCategoryWheel();
+  }
+
+  function endCatDrag() {
+    if (!catDragging) return;
+    catDragging = false;
+    snapCatToNearest();
+  }
+
+  function snapCatToNearest() {
+    const numSlices = CATEGORIES.length;
+    const sliceAngle = (2 * Math.PI) / numSlices;
+    const rawIndex = Math.round(((-catPos % (2 * Math.PI)) + (2 * Math.PI)) % (2 * Math.PI) / sliceAngle) % numSlices;
+    winningCatIndex = rawIndex;
+
+    const currentRotations = Math.floor(catPos / (2 * Math.PI));
+    const targetBaseAngle = (numSlices - winningCatIndex) * sliceAngle;
+    const targetPos = currentRotations * (2 * Math.PI) + targetBaseAngle;
+
+    animateCatToPosition(targetPos, 400);
+  }
+
+  function spinCategoryWheel() {
+    if (isCatSpinning) return;
+
+    document.getElementById('categoryWinnerBox').style.display = 'none';
+    document.getElementById('productWinnerBox').style.display = 'none';
+
+    const numSlices = CATEGORIES.length;
+    const sliceAngle = (2 * Math.PI) / numSlices;
+
+    winningCatIndex = Math.floor(Math.random() * numSlices);
+
+    const targetBaseAngle = (numSlices - winningCatIndex) * sliceAngle;
+    const extraRounds = (5 + Math.floor(Math.random() * 4)) * (2 * Math.PI);
+    const currentRotations = Math.floor(catPos / (2 * Math.PI));
+    const targetPos = (currentRotations + 1) * (2 * Math.PI) + targetBaseAngle + extraRounds;
+
+    animateCatToPosition(targetPos, 4000);
+  }
+
+  function animateCatToPosition(targetPos, duration) {
+    isCatSpinning = true;
+    document.getElementById('catSpinBtn').disabled = true;
+
+    const start = performance.now();
+    const initialPos = catPos;
+
+    function animate(now) {
+      const elapsed = now - start;
+      const progress = Math.min(elapsed / duration, 1);
+      const ease = 1 - Math.pow(1 - progress, 3);
+
+      catPos = initialPos + (ease * (targetPos - initialPos));
+      drawCategoryWheel();
+
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        catPos = targetPos;
+        drawCategoryWheel();
+        isCatSpinning = false;
+        document.getElementById('catSpinBtn').disabled = false;
+        onCategorySelected();
+      }
+    }
+
+    requestAnimationFrame(animate);
+  }
+
+  function onCategorySelected() {
+    selectedCategory = CATEGORIES[winningCatIndex];
+    document.getElementById('categoryWinnerTitle').textContent = selectedCategory;
+    document.getElementById('categoryWinnerBox').style.display = 'block';
+
+    // Populate Product Wheel items for this category
+    currentProductList = PRODUCTS_BY_CATEGORY[selectedCategory] || [];
+    prodPos = 0;
+
+    // Show Product Wheel Section
+    const prodSection = document.getElementById('productSection');
+    document.getElementById('productStepBadge').textContent = `Step 2: ${selectedCategory} Product`;
+    prodSection.style.display = 'flex';
+
+    drawProductWheel();
+    confetti({ particleCount: 40, spread: 50, origin: { y: 0.6 } });
+  }
+
+  /* --- Product Wheel Drag Handling --- */
+  prodCanvas.addEventListener('mousedown', (e) => startProdDrag(e.clientY));
+  window.addEventListener('mousemove', (e) => moveProdDrag(e.clientY));
+  window.addEventListener('mouseup', endProdDrag);
+
+  prodCanvas.addEventListener('touchstart', (e) => startProdDrag(e.touches[0].clientY));
+  window.addEventListener('touchmove', (e) => moveProdDrag(e.touches[0].clientY));
+  window.addEventListener('touchend', endProdDrag);
+
+  function startProdDrag(y) {
+    if (isProdSpinning) return;
+    prodDragging = true;
+    prodStartY = y;
+    prodDragStartPos = prodPos;
+  }
+
+  function moveProdDrag(y) {
+    if (!prodDragging) return;
+    const deltaY = y - prodStartY;
+    prodPos = prodDragStartPos + (deltaY * 0.015);
+    drawProductWheel();
+  }
+
+  function endProdDrag() {
+    if (!prodDragging) return;
+    prodDragging = false;
+    snapProdToNearest();
+  }
+
+  function snapProdToNearest() {
+    const numSlices = currentProductList.length;
+    const sliceAngle = (2 * Math.PI) / numSlices;
+    const rawIndex = Math.round(((-prodPos % (2 * Math.PI)) + (2 * Math.PI)) % (2 * Math.PI) / sliceAngle) % numSlices;
+    winningProdIndex = rawIndex;
+
+    const currentRotations = Math.floor(prodPos / (2 * Math.PI));
+    const targetBaseAngle = (numSlices - winningProdIndex) * sliceAngle;
+    const targetPos = currentRotations * (2 * Math.PI) + targetBaseAngle;
+
+    animateProdToPosition(targetPos, 400);
+  }
+
+  function spinProductWheel() {
+    if (isProdSpinning || currentProductList.length === 0) return;
+
+    document.getElementById('productWinnerBox').style.display = 'none';
+
+    const numSlices = currentProductList.length;
+    const sliceAngle = (2 * Math.PI) / numSlices;
+
+    winningProdIndex = Math.floor(Math.random() * numSlices);
+
+    const targetBaseAngle = (numSlices - winningProdIndex) * sliceAngle;
+    const extraRounds = (5 + Math.floor(Math.random() * 4)) * (2 * Math.PI);
+    const currentRotations = Math.floor(prodPos / (2 * Math.PI));
+    const targetPos = (currentRotations + 1) * (2 * Math.PI) + targetBaseAngle + extraRounds;
+
+    animateProdToPosition(targetPos, 4000);
+  }
+
+  function animateProdToPosition(targetPos, duration) {
+    isProdSpinning = true;
+    document.getElementById('prodSpinBtn').disabled = true;
+
+    const start = performance.now();
+    const initialPos = prodPos;
+
+    function animate(now) {
+      const elapsed = now - start;
+      const progress = Math.min(elapsed / duration, 1);
+      const ease = 1 - Math.pow(1 - progress, 3);
+
+      prodPos = initialPos + (ease * (targetPos - initialPos));
+      drawProductWheel();
+
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        prodPos = targetPos;
+        drawProductWheel();
+        isProdSpinning = false;
+        document.getElementById('prodSpinBtn').disabled = false;
+        onProductSelected();
+      }
+    }
+
+    requestAnimationFrame(animate);
+  }
+
+  function onProductSelected() {
+    const winnerProduct = currentProductList[winningProdIndex];
+    document.getElementById('productWinnerTitle').textContent = winnerProduct;
+    document.getElementById('productWinnerBox').style.display = 'block';
+
+    confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
+  }
+
+  // Initial render of Category Wheel
+  drawCategoryWheel();
+</script>
+</body>
+</html>
