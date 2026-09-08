@@ -197,6 +197,14 @@
       color: #ffb3e6;
       font-size: 0.85rem;
     }
+    .sheet-status { max-width: 650px; text-align: center; margin-bottom: 1.5rem; font-size: .9rem; color: #ffb3e6; line-height: 1.6; }
+    .sheet-reference { align-self: flex-start; margin-top: auto; padding-top: 2rem; font-size: .75rem; }
+    .sheet-reference a { color: #b59aa9; text-decoration: none; }
+    .sheet-reference a:hover, .sheet-reference a:focus-visible { color: #ffb3e6; text-decoration: underline; }
+    .reset-btn { align-self: center; margin-top: 12px; padding: 10px 20px; min-height: 44px; border: 1px solid #b59aa9; border-radius: 22px; background: transparent; color: #ffb3e6; font-size: .9rem; cursor: pointer; }
+    .reset-btn:hover:not(:disabled), .reset-btn:focus-visible { border-color: #ffb3e6; background: rgba(255, 0, 127, .12); }
+    .reset-btn:disabled { opacity: .4; cursor: not-allowed; }
+    #retryLoad { margin-left: 12px; padding: 6px 14px; cursor: pointer; }
   </style>
 </head>
 <body>
@@ -204,6 +212,10 @@
   <h1>Makeup Look Builder 💄✨</h1>
   <p class="subtitle">Spin the category wheel first, then spin for your exact product!</p>
 
+  <div class="sheet-status">
+    <p id="loadStatus" role="status" aria-live="polite">Loading your collection…</p>
+    <button id="retryLoad" type="button" onclick="loadInventory()" hidden>Try again</button>
+  </div>
   <div class="wheels-container">
     <!-- WHEEL 1: CATEGORY -->
     <div class="wheel-section" id="categorySection">
@@ -213,7 +225,7 @@
         <div class="pointer-right"></div>
         <canvas id="categoryCanvas" class="wheel-canvas" width="320" height="380"></canvas>
       </div>
-      <button class="spin-btn" id="catSpinBtn" onclick="spinCategoryWheel()">PICK CATEGORY 🎲</button>
+      <button class="spin-btn" id="catSpinBtn" disabled onclick="spinCategoryWheel()">Spin</button>
     </div>
 
     <!-- WHEEL 2: PRODUCT (Appears after Category is chosen) -->
@@ -224,7 +236,7 @@
         <div class="pointer-right"></div>
         <canvas id="productCanvas" class="wheel-canvas" width="320" height="380"></canvas>
       </div>
-      <button class="spin-btn" id="prodSpinBtn" onclick="spinProductWheel()">PICK PRODUCT 🎲</button>
+      <button class="spin-btn" id="prodSpinBtn" onclick="spinProductWheel()">Spin</button>
     </div>
   </div>
 
@@ -240,89 +252,141 @@
     </div>
   </div>
 
-<script>
-  // Top-Level Categories
-  const CATEGORIES = [
-    'Lipsticks', 
-    'Lip Liners', 
-    'Blush', 
-    'Shadow Sticks', 
-    'Eyeliners', 
-    'Liquid Eyeshadows', 
-    'Eyeshadow Palettes'
-  ];
+  <button type="button" class="reset-btn" id="resetBtn" onclick="resetLook()" hidden>Start over</button>
 
-  // Brand + Product Name Data for each category
-  const PRODUCTS_BY_CATEGORY = {
-    'Lipsticks': [
-      'MAC - Velvet Teddy',
-      'Fenty - Gloss Bomb Stix',
-      'Charlotte Tilbury - Pillow Talk',
-      'Rare Beauty - Kind Words',
-      'NARS - Powermatte Lip',
-      'YSL - Rouge Volupté',
-      'Maybelline - SuperStay Ink'
-    ],
-    'Lip Liners': [
-      'MAC - Spice',
-      'Charlotte Tilbury - Lip Cheat',
-      'NYX - Slim Lip Pencil',
-      'Make Up For Ever - Wherever Walnut',
-      'Tower 28 - OneLiner',
-      'Refy - Lip Sculpt',
-      'Sephora Collection - Rouge Gel'
-    ],
-    'Blush': [
-      'Rare Beauty - Soft Pinch Liquid',
-      'NARS - Orgasm Powder Blush',
-      'Glossier - Cloud Paint',
-      'Patrick Ta - Double-Take Cream',
-      'Fenty - Cheeks Out Cream',
-      'Saie - Dew Blush',
-      'Benefit - Benetint Lip & Cheek'
-    ],
-    'Shadow Sticks': [
-      'Laura Mercier - Caviar Stick',
-      'Bobbi Brown - Long-Wear Cream',
-      'Kuddy - Color Shadow Stick',
-      'e.l.f. - No Budge Shadow Stick',
-      'Rare Beauty - All-of-Above Stick',
-      'Nudestix - Magnetic Eye Color',
-      'NYX - Jumbo Eye Pencil'
-    ],
-    'Eyeliners': [
-      'Urban Decay - 24/7 Glide-On',
-      'Stila - Stay All Day Liquid',
-      'KVD Beauty - Tattoo Liner',
-      'One/Size - Point Made Liquid',
-      'NYX - Epic Ink Liner',
-      'Victoria Beckham - Satin Kajal',
-      'Makeup By Mario - Master Pigment'
-    ],
-    'Liquid Eyeshadows': [
-      'Stila - Glitter & Glow',
-      'Danessa Myricks - Twin Flames',
-      'e.l.f. - Liquid Metallic Eye',
-      'About-Face - Matte Fluid Eye',
-      'Rem Beauty - Lustrous Liquid',
-      'Glossier - Lidstar Eye Glow',
-      'Hourglass - Scatter Light'
-    ],
-    'Eyeshadow Palettes': [
-      'Urban Decay - Naked3 Palette',
-      'Makeup By Mario - Ethereal Eyes',
-      'Anastasia - Modern Renaissance',
-      'Natasha Denona - Glam Palette',
-      'Too Faced - Born This Way',
-      'Tarte - Tartelette In Bloom',
-      'Huda Beauty - Empowered'
-    ]
-  };
+  <footer class="sheet-reference">
+    <a href="https://docs.google.com/spreadsheets/d/10BKFl1hF1QAsp_Wso0PFr6pX-Eignnl4aqzHfr5bd2A/edit" target="_blank" rel="noopener noreferrer">Spreadsheet ↗</a>
+  </footer>
+
+<script>
+  // Load the inventory once per page open. No polling or cached product list.
+  const SHEET_ID = '10BKFl1hF1QAsp_Wso0PFr6pX-Eignnl4aqzHfr5bd2A';
+  const INVENTORY_TABS = [
+    'Lipsticks', 'Blush', 'Shadow Sticks', 'Eyeliners',
+    'Liquid or Cream Eyeshadows', 'Single Shadows', 'Eyeshadow Palettes'
+  ];
+  let CATEGORIES = [];
+  let PRODUCTS_BY_CATEGORY = {};
+  let loading = false;
+  let requestId = 0;
+
+  function readInventoryTab(tabName) {
+    // Google's supported response handler also works when opened as a local HTML file.
+    return new Promise((resolve, reject) => {
+      const callback = 'makeupSheetResponse' + (++requestId);
+      const script = document.createElement('script');
+      const timeout = setTimeout(() => finish(new Error('Google Sheets took too long to respond.')), 20000);
+      function finish(error, data) {
+        clearTimeout(timeout);
+        script.remove();
+        delete window[callback];
+        if (error) reject(error); else resolve(data);
+      }
+      window[callback] = data => {
+        if (data.status !== 'ok' || !data.table) {
+          finish(new Error('Could not read the ' + tabName + ' tab.'));
+          return;
+        }
+        try { finish(null, parseInventory(data.table, tabName)); }
+        catch (error) { finish(error); }
+      };
+      script.onerror = () => finish(new Error('Could not connect to Google Sheets.'));
+      const params = new URLSearchParams({
+        sheet: tabName, headers: '0', range: 'A:G',
+        tqx: 'out:json;responseHandler:' + callback,
+        _ : String(Date.now())
+      });
+      script.src = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID + '/gviz/tq?' + params;
+      document.head.appendChild(script);
+    });
+  }
+
+  function parseInventory(table, tabName) {
+    const rows = table.rows.map(row => row.c.map(cell => String(cell?.v ?? '').trim()));
+    const headerIndex = rows.findIndex(row => row.includes('Brand') && row.includes('Name'));
+    if (headerIndex < 0) throw new Error('Missing Brand or Name column in ' + tabName + '.');
+    const header = rows[headerIndex];
+    const brandIndex = header.indexOf('Brand');
+    const nameIndex = header.indexOf('Name');
+    const lineIndex = header.indexOf('Line');
+    const colorIndex = header.indexOf('Color Family');
+    const seen = new Set();
+    return rows.slice(headerIndex + 1).filter(row =>
+      row[brandIndex] && row[nameIndex] && row[brandIndex] !== 'Brand'
+    ).map(row => {
+      const parts = [row[brandIndex], lineIndex >= 0 ? row[lineIndex] : '', row[nameIndex]].filter(Boolean);
+      return { label: parts.join(' — '), parts, colorFamily: colorIndex >= 0 ? row[colorIndex] || '' : '' };
+    }).filter(product => {
+      if (seen.has(product.label)) return false;
+      seen.add(product.label);
+      return true;
+    });
+  }
+
+  async function loadInventory() {
+    if (loading) return;
+    loading = true;
+    const status = document.getElementById('loadStatus');
+    status.parentElement.hidden = false;
+    document.getElementById('retryLoad').hidden = true;
+    status.textContent = 'Loading your collection from Google Sheets…';
+    try {
+      const lists = await Promise.all(INVENTORY_TABS.map(readInventoryTab));
+      const entries = INVENTORY_TABS.map((name, i) => [name, lists[i]]).filter(([, list]) => list.length);
+      if (!entries.length) throw new Error('No products found in the inventory tabs.');
+      PRODUCTS_BY_CATEGORY = Object.fromEntries(entries);
+      CATEGORIES = entries.map(([name]) => name);
+      drawCategoryWheel();
+      document.getElementById('catSpinBtn').disabled = false;
+      status.textContent = '';
+      status.parentElement.hidden = true;
+    } catch (error) {
+      status.textContent = 'Unable to load your collection. ' + error.message + ' Check your connection and that the sheet is still accessible.';
+      document.getElementById('retryLoad').hidden = false;
+    } finally { loading = false; }
+  }
 
   const sliceColors = [
     '#ff0055', '#7b2cbf', '#ff9e00', '#00b4d8', 
     '#38b000', '#e01e37', '#9d4edd'
   ];
+
+  const familyColors = {
+    red: '#a84d58', brown: '#896451', nude: '#d2b29d', pink: '#d695b1',
+    purple: '#9171a9', black: '#34313c', blue: '#668fb5', green: '#789579',
+    orange: '#ce9368', yellow: '#d5bd77', gold: '#bca064', silver: '#b3b8c2',
+    white: '#e7e0da', beige: '#d5c3a7', rose: '#b9768b', peach: '#deb09b',
+    coral: '#cd897b', burgundy: '#774452', plum: '#81516f', mauve: '#ad899e',
+    taupe: '#a99b90', grey: '#98989f', gray: '#98989f', teal: '#608e91'
+  };
+
+  function productPalette(product) {
+    const firstFamily = product.colorFamily.split(',')[0].trim().toLowerCase();
+    const background = familyColors[firstFamily] || '#85808e';
+    const channels = background.slice(1).match(/../g).map(hex => {
+      const value = parseInt(hex, 16) / 255;
+      return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+    });
+    const luminance = channels[0] * .2126 + channels[1] * .7152 + channels[2] * .0722;
+    return { background, text: luminance > .179 ? '#111111' : '#ffffff' };
+  }
+
+  function wrapLabel(ctx, text, maxWidth) {
+    const lines = [];
+    let line = '';
+    for (const word of text.split(/\s+/)) {
+      const candidate = line ? line + ' ' + word : word;
+      if (ctx.measureText(candidate).width <= maxWidth) { line = candidate; continue; }
+      if (line) lines.push(line);
+      line = '';
+      for (const char of word) {
+        if (line && ctx.measureText(line + char).width > maxWidth) { lines.push(line); line = ''; }
+        line += char;
+      }
+    }
+    if (line) lines.push(line);
+    return lines;
+  }
 
   // Category Wheel State
   let catPos = 0;
@@ -355,6 +419,17 @@
     const width = canvasObj.width;
     const height = canvasObj.height;
     const centerY = height / 2;
+    // Repeat small lists to keep the drum drawable, and show a moving window for large inventories.
+    // Selection uses the full list, so every product keeps an equal chance.
+    const originalCount = items.length;
+    if (originalCount > 0) {
+      const visibleCount = 9;
+      const step = 2 * Math.PI / originalCount;
+      const center = Math.round(-currentPos / step);
+      const fraction = currentPos / step + center;
+      items = Array.from({length: visibleCount}, (_, i) => items[((center + i - 4) % originalCount + originalCount) % originalCount]);
+      currentPos = (fraction - 4) * (2 * Math.PI / visibleCount);
+    }
     const numSlices = items.length;
     const sliceAngle = (2 * Math.PI) / numSlices;
 
@@ -390,7 +465,9 @@
           const depth = Math.cos(angle);
           
           ctx.save();
-          ctx.fillStyle = sliceColors[i % sliceColors.length];
+          const product = typeof items[i] === 'object' ? items[i] : null;
+          const palette = product ? productPalette(product) : null;
+          ctx.fillStyle = palette ? palette.background : sliceColors[i % sliceColors.length];
           ctx.fillRect(drumLeft, yTop, drumWidth, sliceHeight);
 
           const shadowGrad = ctx.createLinearGradient(0, yTop, 0, yBottom);
@@ -411,23 +488,26 @@
           ctx.fill();
 
           if (depth > 0.2) {
-            ctx.fillStyle = '#ffffff';
-            // Adjust font size dynamically if label is long
-            const rawLabel = items[i];
-            let fontPx = 16;
-            if (rawLabel.length > 22) fontPx = 11;
-            else if (rawLabel.length > 16) fontPx = 13;
-
-            const fontSize = Math.max(9, Math.floor(fontPx * depth));
-            ctx.font = `900 ${fontSize}px sans-serif`;
+            ctx.beginPath();
+            ctx.rect(drumLeft + 5, yTop + 4, drumWidth - 10, sliceHeight - 8);
+            ctx.clip();
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            
-            ctx.shadowColor = '#000';
-            ctx.shadowBlur = 4;
-            ctx.shadowOffsetY = 2;
-
-            ctx.fillText(rawLabel, width / 2, yTop + sliceHeight / 2);
+            ctx.fillStyle = palette ? palette.text : '#ffffff';
+            const parts = product ? product.parts : [items[i]];
+            let fontSize = product ? 14 : 16;
+            let lines;
+            do {
+              ctx.font = `700 ${fontSize}px sans-serif`;
+              lines = parts.flatMap(part => wrapLabel(ctx, part, drumWidth - 24));
+              if (lines.length * fontSize * 1.15 <= 76 || fontSize <= 11) break;
+              fontSize--;
+            } while (true);
+            // Wrap at normal letter proportions; only the drum perspective compresses height.
+            const lineHeight = fontSize * 1.15;
+            ctx.translate(width / 2, (yTop + yBottom) / 2);
+            ctx.scale(1, Math.max(.2, depth));
+            lines.forEach((line, index) => ctx.fillText(line, 0, (index - (lines.length - 1) / 2) * lineHeight));
           }
 
           ctx.restore();
@@ -437,7 +517,7 @@
 
     ctx.strokeStyle = 'rgba(255, 230, 0, 0.8)';
     ctx.lineWidth = 3;
-    ctx.strokeRect(drumLeft - 2, centerY - 22, drumWidth + 4, 44);
+    ctx.strokeRect(drumLeft - 2, centerY - 46, drumWidth + 4, 92);
   }
 
   function drawCategoryWheel() {
@@ -460,7 +540,7 @@
   window.addEventListener('touchend', endCatDrag);
 
   function startCatDrag(y) {
-    if (isCatSpinning) return;
+    if (isCatSpinning || isProdSpinning || !CATEGORIES.length) return;
     catDragging = true;
     catStartY = y;
     catDragStartPos = catPos;
@@ -493,7 +573,7 @@
   }
 
   function spinCategoryWheel() {
-    if (isCatSpinning) return;
+    if (isCatSpinning || isProdSpinning || !CATEGORIES.length) return;
 
     document.getElementById('categoryWinnerBox').style.display = 'none';
     document.getElementById('productWinnerBox').style.display = 'none';
@@ -512,7 +592,12 @@
   }
 
   function animateCatToPosition(targetPos, duration) {
+    catDragging = false;
+    prodDragging = false;
     isCatSpinning = true;
+    document.getElementById('resetBtn').disabled = true;
+    document.getElementById('productSection').style.display = 'none';
+    document.getElementById('productWinnerBox').style.display = 'none';
     document.getElementById('catSpinBtn').disabled = true;
 
     const start = performance.now();
@@ -540,7 +625,32 @@
     requestAnimationFrame(animate);
   }
 
+  function resetLook() {
+    if (isCatSpinning || isProdSpinning) return;
+    catDragging = false;
+    prodDragging = false;
+    catPos = 0;
+    prodPos = 0;
+    winningCatIndex = 0;
+    winningProdIndex = 0;
+    selectedCategory = '';
+    currentProductList = [];
+    document.getElementById('categoryWinnerBox').style.display = 'none';
+    document.getElementById('productWinnerBox').style.display = 'none';
+    document.getElementById('categoryWinnerTitle').textContent = '';
+    document.getElementById('productWinnerTitle').textContent = '';
+    document.getElementById('productSection').style.display = 'none';
+    document.getElementById('productStepBadge').textContent = 'Step 2: Product';
+    document.getElementById('resetBtn').hidden = true;
+    prodCanvas.getContext('2d').clearRect(0, 0, prodCanvas.width, prodCanvas.height);
+    drawCategoryWheel();
+    document.getElementById('catSpinBtn').focus();
+    document.getElementById('categorySection').scrollIntoView({block: 'nearest', behavior: 'smooth'});
+  }
+
   function onCategorySelected() {
+    document.getElementById('resetBtn').hidden = false;
+    document.getElementById('resetBtn').disabled = false;
     selectedCategory = CATEGORIES[winningCatIndex];
     document.getElementById('categoryWinnerTitle').textContent = selectedCategory;
     document.getElementById('categoryWinnerBox').style.display = 'block';
@@ -555,7 +665,7 @@
     prodSection.style.display = 'flex';
 
     drawProductWheel();
-    confetti({ particleCount: 40, spread: 50, origin: { y: 0.6 } });
+    if (typeof confetti === 'function') confetti({ particleCount: 40, spread: 50, origin: { y: 0.6 } });
   }
 
   /* --- Product Wheel Drag Handling --- */
@@ -568,7 +678,7 @@
   window.addEventListener('touchend', endProdDrag);
 
   function startProdDrag(y) {
-    if (isProdSpinning) return;
+    if (isProdSpinning || isCatSpinning || !currentProductList.length) return;
     prodDragging = true;
     prodStartY = y;
     prodDragStartPos = prodPos;
@@ -601,7 +711,7 @@
   }
 
   function spinProductWheel() {
-    if (isProdSpinning || currentProductList.length === 0) return;
+    if (isProdSpinning || isCatSpinning || currentProductList.length === 0) return;
 
     document.getElementById('productWinnerBox').style.display = 'none';
 
@@ -619,7 +729,9 @@
   }
 
   function animateProdToPosition(targetPos, duration) {
+    prodDragging = false;
     isProdSpinning = true;
+    document.getElementById('resetBtn').disabled = true;
     document.getElementById('prodSpinBtn').disabled = true;
 
     const start = performance.now();
@@ -648,15 +760,16 @@
   }
 
   function onProductSelected() {
+    document.getElementById('resetBtn').disabled = false;
     const winnerProduct = currentProductList[winningProdIndex];
-    document.getElementById('productWinnerTitle').textContent = winnerProduct;
+    document.getElementById('productWinnerTitle').textContent = winnerProduct.label;
     document.getElementById('productWinnerBox').style.display = 'block';
 
-    confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
+    if (typeof confetti === 'function') confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
   }
 
-  // Initial render of Category Wheel
   drawCategoryWheel();
+  loadInventory();
 </script>
 </body>
 </html>
